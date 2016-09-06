@@ -2,13 +2,10 @@ from libchem import Atom, CombineAtom
 
 import sys
 import csv
+import json
 
 def print_atom(a):
-    print "---"
-    print "{0} - {1} - {2}".format(a.name, a.symbol, a.number)
-    print a.shell
-    print "Valence electrons: {0}".format(len(a.valence()))
-    print "---"
+    print a.transfer_json()
 
 if __name__ == "__main__":
     argv = sys.argv
@@ -25,10 +22,10 @@ if __name__ == "__main__":
             for entry in row:
                 ent = entry.strip()
                 if argv[1] == ent:
-                    a_ = {"number": int(row[0]), "symbol": row[1], "name": row[2].strip()}
+                    a_ = {"number": int(row[2]), "symbol": row[1].strip(), "name": row[0].strip(), "eln": row[15]}
 
                 if argv[2] == ent:
-                    a2_ = {"number": int(row[0]), "symbol": row[1], "name": row[2].strip()}
+                    a2_ = {"number": int(row[2]), "symbol": row[1].strip(), "name": row[0].strip(), "eln": row[15]}
 
     if not a_:
         print "Atom with (number/symbol/name) {0} not found!".format(argv[1])
@@ -38,11 +35,8 @@ if __name__ == "__main__":
         print "Atom with (number/symbol/name) {0} not found!".format(argv[2])
         sys.exit(-1)
 
-    a = Atom(a_["number"], a_["name"], a_["symbol"])
-    print_atom(a)
-
-    a2 = Atom(a2_["number"], a2_["name"], a2_["symbol"])
-    print_atom(a2)
+    a = Atom(a_["number"], a_["name"], a_["symbol"], a_["eln"])
+    a2 = Atom(a2_["number"], a2_["name"], a2_["symbol"], a2_["eln"])
 
     new_a = CombineAtom(a, a2)
     print_atom(new_a.new_atom)

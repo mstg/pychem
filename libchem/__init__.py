@@ -1,1 +1,1 @@
-from atom import Atom
+from atom import Atom, CombineAtom
