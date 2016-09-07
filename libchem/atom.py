@@ -70,21 +70,32 @@ class Atom:
         pass
 
 class AtomBonding:
-    def __init__(self, from_a, to_a, needed):
-        self.from_a = from_a
-        self.to_a = to_a
-        self.symbol = "{0}{1}".format(from_a.symbol, to_a.symbol)
+    def __init__(self, should_from, should_to, needed):
+        self.should_from = should_from
+        self.should_to = should_to
+        self.symbol = "{0}{1}".format(should_from.symbol, should_to.symbol)
         self.name = self.symbol
 
         needed_c = needed
         removed = 0
-        after_from_a = from_a.shell
-        after_to_a = None
+        after_should_from = should_from.shell
+        after_should_to = None
 
-        compeln = from_a.comp_eln(to_a)
+        compeln = should_from.comp_eln(should_to)
         wname = compeln["weakest"].name
         sname = compeln["strongest"].name
         diff = compeln["elndiff"]
+
+        wval = len(compeln["weakest"].valence())
+        sval = len(compeln["strongest"].valence())
+        vlist = [wval, sval]
+
+        cl = min(vlist, key=lambda x:abs(x-8))
+        cl_ch = {wval: compeln["weakest"], sval: compeln["strongest"]}
+
+        should_to = cl_ch[cl]
+        vlist.remove(cl)
+        should_from = cl_ch[vlist[-1]]
 
         ionic_min = 2
         polar_covalent_min = 0.4
@@ -92,65 +103,65 @@ class AtomBonding:
         covalent_max = 0.4
 
         self.j = {}
-        self.j[from_a.name] = {
-            "symbol": from_a.symbol,
-            "shell": from_a.shell,
-            "number": from_a.number,
+        self.j[should_from.name] = {
+            "symbol": should_from.symbol,
+            "shell": should_from.shell,
+            "number": should_from.number,
         }
 
-        if from_a.name != to_a.name:
-            self.j[to_a.name] = {
-                "symbol": to_a.symbol,
-                "shell": to_a.shell,
-                "number": to_a.number,
+        if should_from.name != should_to.name:
+            self.j[should_to.name] = {
+                "symbol": should_to.symbol,
+                "shell": should_to.shell,
+                "number": should_to.number,
             }
 
-        temp_from_a = Atom(from_a.number - needed, "", self.symbol, 0)
-        after_from_a = temp_from_a.shell
+        temp_should_from = Atom(should_from.number - needed, "", self.symbol, 0)
+        after_should_from = temp_should_from.shell
 
-        temp_to_a = Atom(to_a.number + needed, "", self.symbol, 0)
-        after_to_a = temp_to_a.shell
+        temp_should_to = Atom(should_to.number + needed, "", self.symbol, 0)
+        after_should_to = temp_should_to.shell
 
         if diff == 0:
-            self.j[from_a.name]["gets"] = 0
-            self.j[from_a.name]["gets_from"] = wname
-            self.j[from_a.name]["priority"] = 0
-            self.j[from_a.name]["after"] = from_a.shell
+            self.j[should_from.name]["gets"] = 0
+            self.j[should_from.name]["gets_from"] = wname
+            self.j[should_from.name]["priority"] = 0
+            self.j[should_from.name]["after"] = should_from.shell
         elif diff < covalent_max:
-            self.j[to_a.name]["gets"] = needed
-            self.j[to_a.name]["gets_from"] = wname
-            self.j[to_a.name]["priority"] = 0
+            self.j[should_to.name]["gets"] = needed
+            self.j[should_to.name]["gets_from"] = wname
+            self.j[should_to.name]["priority"] = 0
 
-            self.j[from_a.name]["gets"] = needed
-            self.j[from_a.name]["gets_from"] = sname
-            self.j[from_a.name]["priority"] = 0
+            self.j[should_from.name]["gets"] = needed
+            self.j[should_from.name]["gets_from"] = sname
+            self.j[should_from.name]["priority"] = 0
         elif diff > polar_covalent_min and diff < polar_covalent_max:
-            temp_from_a = Atom(from_a.number + needed, "", self.symbol, 0)
-            after_from_a = temp_from_a.shell
+            temp_should_from = Atom(should_from.number + needed, "", self.symbol, 0)
+            after_should_from = temp_should_from.shell
 
-            temp_to_a = Atom(to_a.number - needed, "", self.symbol, 0)
-            after_to_a = temp_to_a.shell
+            temp_should_to = Atom(should_to.number - needed, "", self.symbol, 0)
+            after_should_to = temp_should_to.shell
 
-            self.j[to_a.name]["gets"] = needed
-            self.j[to_a.name]["gets_from"] = from_a.name
-            self.j[to_a.name]["priority"] = 0.5
+            self.j[should_to.name]["gets"] = needed
+            self.j[should_to.name]["gets_from"] = should_from.name
+            self.j[should_to.name]["priority"] = 0.5
 
-            self.j[from_a.name]["gets"] = needed
-            self.j[from_a.name]["gets_from"] = to_a.name
-            self.j[from_a.name]["priority"] = 0.5
+            self.j[should_from.name]["gets"] = needed
+            self.j[should_from.name]["gets_from"] = should_to.name
+            self.j[should_from.name]["priority"] = 0.5
         elif diff > ionic_min:
-            self.j[to_a.name]["gets"] = needed
-            self.j[to_a.name]["gets_from"] = from_a.name
-            self.j[to_a.name]["priority"] = 1
+            self.j[should_to.name]["gets"] = needed
+            self.j[should_to.name]["gets_from"] = should_from.name
+            self.j[should_to.name]["priority"] = 1
 
-            self.j[from_a.name]["gives"] = needed
-            self.j[from_a.name]["gives_to"] = to_a.name
-            self.j[from_a.name]["priority"] = 0
+            self.j[should_from.name]["gives"] = needed
+            self.j[should_from.name]["gives_to"] = should_to.name
+            self.j[should_from.name]["priority"] = 0
 
-        self.j[from_a.name]["after"] = after_from_a
+        self.j[should_from.name]["after"] = after_should_from
 
-        if from_a.name != to_a.name:
-            self.j[to_a.name]["after"] = after_to_a
+        if should_from.name != should_to.name:
+            self.j[should_to.name]["after"] = after_should_to
 
     def transfer_json(self):
         return json.dumps(self.j, indent=4, sort_keys=True)
@@ -169,7 +180,7 @@ class CombineAtom:
         transfer_el = a_te.needed(a_to)
 
         new_a = AtomBonding(a_to, a_te, transfer_el)
-        self.new_atom = new_a 
+        self.new_atom = new_a
 
     def share(self, valence, valence2):
         return True if len(valence) == len(valence2) else False

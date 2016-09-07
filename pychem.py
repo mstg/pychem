@@ -6,6 +6,7 @@ import json
 
 def print_atom(a):
     print a.transfer_json()
+    pass
 
 if __name__ == "__main__":
     argv = sys.argv
