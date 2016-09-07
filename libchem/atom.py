@@ -15,12 +15,14 @@ class Atom:
         in_shell = 1
         shell = {}
         shell["electrons"] = []
+        total_electrons = 0
         for x in range(1, self.number+1):
             space = calc_2n2(in_shell)
             shell["space"] = space
 
             if len(shell["electrons"]) < space:
                 shell["electrons"].append(x)
+                total_electrons += 1
             else:
                 self.shell.append(shell)
 
@@ -32,6 +34,9 @@ class Atom:
                 shell["electrons"] = []
 
                 shell["electrons"].append(x)
+                total_electrons += 1
+
+        self.total = total_electrons
 
         self.shell.append(shell)
 
@@ -59,8 +64,8 @@ class Atom:
 
     def needed(self, a):
         compeln = self.comp_eln(a)
-        wname = compeln["weakest"].name
-        sname = compeln["strongest"].name
+        w = compeln["weakest"]
+        s = compeln["strongest"]
         diff = compeln["elndiff"]
 
         # Temporary
@@ -71,31 +76,45 @@ class Atom:
 
 class AtomBonding:
     def __init__(self, should_from, should_to, needed):
-        self.should_from = should_from
-        self.should_to = should_to
         self.symbol = "{0}{1}".format(should_from.symbol, should_to.symbol)
         self.name = self.symbol
+        self.should_from = should_from
+        self.should_to = should_to
 
-        needed_c = needed
-        removed = 0
-        after_should_from = should_from.shell
-        after_should_to = None
+        was_neg = False
+        if needed < 0:
+            needed = abs(needed)
+            was_neg = True
 
         compeln = should_from.comp_eln(should_to)
+        diff = compeln["elndiff"]
+
         wname = compeln["weakest"].name
         sname = compeln["strongest"].name
-        diff = compeln["elndiff"]
 
         wval = len(compeln["weakest"].valence())
         sval = len(compeln["strongest"].valence())
-        vlist = [wval, sval]
 
-        cl = min(vlist, key=lambda x:abs(x-8))
-        cl_ch = {wval: compeln["weakest"], sval: compeln["strongest"]}
+        if wval != sval:
+            vlist = [wval, sval]
 
-        should_to = cl_ch[cl]
-        vlist.remove(cl)
-        should_from = cl_ch[vlist[-1]]
+            cl = min(vlist, key=lambda x:abs(x-8))
+            cl_ch = {wval: compeln["weakest"], sval: compeln["strongest"]}
+
+            should_to = cl_ch[cl]
+            vlist.remove(cl)
+            should_from = cl_ch[vlist[-1]]
+        else:
+            wval = len(compeln["weakest"].shell)
+            sval = len(compeln["strongest"].shell)
+            vlist = [wval, sval]
+
+            cl = max(vlist)
+            cl_ch = {wval: compeln["weakest"], sval: compeln["strongest"]}
+
+            should_from = cl_ch[cl]
+            vlist.remove(cl)
+            should_to = cl_ch[vlist[-1]]
 
         ionic_min = 2
         polar_covalent_min = 0.4
@@ -117,37 +136,41 @@ class AtomBonding:
             }
 
         temp_should_from = Atom(should_from.number - needed, "", self.symbol, 0)
-        after_should_from = temp_should_from.shell
+        after_should_from = {"shell": temp_should_from.shell, "total": temp_should_from.total}
 
         temp_should_to = Atom(should_to.number + needed, "", self.symbol, 0)
-        after_should_to = temp_should_to.shell
+        after_should_to = {"shell": temp_should_to.shell, "total": temp_should_to.total}
 
-        if diff == 0:
+        
+
+        if diff == 0.0:
+            temp_should_from = Atom(should_from.number, "", self.symbol, 0)
+            after_should_from = {"shell": temp_should_from.shell, "total": temp_should_from.total}
+            after_should_to = temp_should_from
             self.j[should_from.name]["gets"] = 0
-            self.j[should_from.name]["gets_from"] = wname
+            self.j[should_from.name]["gets_from"] = should_from.name
             self.j[should_from.name]["priority"] = 0
             self.j[should_from.name]["after"] = should_from.shell
         elif diff < covalent_max:
+            temp_should_from = Atom(should_from.number + needed, "", self.symbol, 0)
+            after_should_from = {"shell": temp_should_from.shell, "total": temp_should_from.total}
+
+            temp_should_to = Atom(should_to.number - needed, "", self.symbol, 0)
+            after_should_to = {"shell": temp_should_to.shell, "total": temp_should_to.total}
             self.j[should_to.name]["gets"] = needed
-            self.j[should_to.name]["gets_from"] = wname
+            self.j[should_to.name]["gets_from"] = should_from.name
             self.j[should_to.name]["priority"] = 0
 
             self.j[should_from.name]["gets"] = needed
-            self.j[should_from.name]["gets_from"] = sname
+            self.j[should_from.name]["gets_from"] = should_to.name
             self.j[should_from.name]["priority"] = 0
         elif diff > polar_covalent_min and diff < polar_covalent_max:
-            temp_should_from = Atom(should_from.number + needed, "", self.symbol, 0)
-            after_should_from = temp_should_from.shell
-
-            temp_should_to = Atom(should_to.number - needed, "", self.symbol, 0)
-            after_should_to = temp_should_to.shell
-
             self.j[should_to.name]["gets"] = needed
             self.j[should_to.name]["gets_from"] = should_from.name
             self.j[should_to.name]["priority"] = 0.5
 
-            self.j[should_from.name]["gets"] = needed
-            self.j[should_from.name]["gets_from"] = should_to.name
+            self.j[should_from.name]["gives"] = needed
+            self.j[should_from.name]["gives_to"] = should_to.name
             self.j[should_from.name]["priority"] = 0.5
         elif diff > ionic_min:
             self.j[should_to.name]["gets"] = needed
@@ -159,9 +182,21 @@ class AtomBonding:
             self.j[should_from.name]["priority"] = 0
 
         self.j[should_from.name]["after"] = after_should_from
+        self.after_from = after_should_from
+        self.after_to = after_should_to
 
         if should_from.name != should_to.name:
             self.j[should_to.name]["after"] = after_should_to
+
+        if was_neg:
+            needed = abs(needed)
+
+            aa = should_to
+            should_to = should_from
+            should_from = aa
+
+        self.should_from = should_from
+        self.should_to = should_to
 
     def transfer_json(self):
         return json.dumps(self.j, indent=4, sort_keys=True)
